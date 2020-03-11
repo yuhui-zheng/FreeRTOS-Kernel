@@ -89,6 +89,15 @@ not need to be guarded with a critical section. */
 /*-----------------------------------------------------------*/
 
 
+/* Machine status register (mstatus) related bit definitions.
+RV32 and RV64 share the same definitions for below. In embedded
+application scenarios, it's likely the target either only have
+M-mode or M-mode and U-mode.  */
+#define portREG_MSTATUS_UIE_BIT			( 1UL )
+#define portREG_MSTATUS_MIE_BIT			( 1UL << 3UL )
+/*-----------------------------------------------------------*/
+
+
 /* Scheduler utilities. */
 extern void vTaskSwitchContext( void );
 #define portYIELD() __asm volatile( "ecall" );
@@ -104,8 +113,8 @@ extern void vTaskExitCritical( void );
 
 #define portSET_INTERRUPT_MASK_FROM_ISR() 0
 #define portCLEAR_INTERRUPT_MASK_FROM_ISR( uxSavedStatusValue ) ( void ) uxSavedStatusValue
-#define portDISABLE_INTERRUPTS()	__asm volatile( "csrc mstatus, 8" )
-#define portENABLE_INTERRUPTS()		__asm volatile( "csrs mstatus, 8" )
+#define portDISABLE_INTERRUPTS()	__asm volatile( "csrc mstatus, %0" :: "i" (portREG_MSTATUS_MIE_BIT) : "memory" )
+#define portENABLE_INTERRUPTS()		__asm volatile( "csrs mstatus, %0" :: "i" (portREG_MSTATUS_MIE_BIT) : "memory" )
 #define portENTER_CRITICAL()	vTaskEnterCritical()
 #define portEXIT_CRITICAL()		vTaskExitCritical()
 
