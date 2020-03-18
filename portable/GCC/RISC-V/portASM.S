@@ -367,7 +367,8 @@ xPortStartFirstTask:
  * x2			sp			Stack pointer					Callee
  * x3			gp			Global pointer					-
  * x4			tp			Thread pointer					-
- * x5-7			t0-2		Temporaries						Caller
+ * x5			t0			Temporary/alternate link register caller
+ * x6-7			t1-2		Temporaries						Caller
  * x8			s0/fp		Saved register/Frame pointer	Callee
  * x9			s1			Saved register					Callee
  * x10-11		a0-1		Function Arguments/return values Caller
