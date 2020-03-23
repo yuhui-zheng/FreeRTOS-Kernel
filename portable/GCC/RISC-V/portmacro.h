@@ -91,8 +91,8 @@ not need to be guarded with a critical section. */
 
 /* Supported privilege levels by embedded profile implementations.
 It's likely embedded systems only supports Machine mode and/or User mode. */
-#define portCONST_PRIVILEGE_USER		0x0UL
-#define portCONST_PRIVILEGE_MACHINE		0x3UL
+#define portCONST_PRIVILEGE_USER		0UL
+#define portCONST_PRIVILEGE_MACHINE		3UL
 
 /* Machine status register (mstatus) related bit definitions.
 RV32 and RV64 share the same definitions for below. */
@@ -107,6 +107,38 @@ RV32 and RV64 share the same definitions for below. */
  https://www.freertos.org/portSWITCH_TO_USER_MODE.html */
 void vPortSwitchToUserMode( void );
 #define portSWITCH_TO_USER_MODE() vPortSwitchToUserMode();
+
+/* The number of PMP entries.
+ An implementation can have up to portCONST_PMP_ABSOLUTE_MAX_ENTRIES PMP regions.
+ An implementation supports in total portCONST_PMP_PORT_MAX_ENTRIES PMP regions. */
+#define portCONST_PMP_ABSOLUTE_MAX_ENTRIES	16UL	/* RISC-V supports up to 16 PMP entries. */
+#define portCONST_PMP_PORT_MAX_ENTRIES		8UL		/* Implementation specific value. */
+
+/* PMP configuration register.
+| bit7 | bit6-5      | bit4-3           | bit2      | bit1  | bit0 |
+| Lock | 0 (padding) | Address matching | eXecution | Write | Read |
+Lock: if locked, writes to the configuration register and associated address registers are ignored.
+Address matching: see portCONST_PMP_ADDRESS_MODE_*.
+eXecution, Write, Read: when set,  */
+
+/* PMP lock configuration register.
+ Locked PMP entries may only be unlocked with a system reset.*/
+#define portCONST_PMP_LOCK_SET 				( 1UL << 7UL )
+
+/* PMP address matching mode configuration. */
+#define portCONST_PMP_ADDRESS_MODE_OFF		( 0UL << 3UL )	/* Null region (disabled). */
+#define portCONST_PMP_ADDRESS_MODE_TOR		( 1UL << 3UL )	/* Top of range. */
+#define portCONST_PMP_ADDRESS_MODE_NA4		( 2UL << 3UL )	/* Naturally aligned four-byte region. */
+#define portCONST_PMP_ADDRESS_MODE_NAPOT	( 3UL << 3UL )	/* Naturally aligned power-of-two region, >=8bytes. */
+
+/* PMP access type configuration.
+ When corresponding bit is set, access of the type is allowed.
+ The combination of R=0 && W=1 is reserved for future use. */
+#define portCONST_PMP_ACCESS_EXECUTABLE		( 1UL << 2UL )
+#define portCONST_PMP_ACCESS_WRITABLE		( 1UL << 1UL )
+#define portCONST_PMP_ACCESS_READABLE		( 1UL )
+
+
 /*-----------------------------------------------------------*/
 
 
