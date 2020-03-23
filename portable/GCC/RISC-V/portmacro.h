@@ -89,12 +89,24 @@ not need to be guarded with a critical section. */
 /*-----------------------------------------------------------*/
 
 
+/* Supported privilege levels by embedded profile implementations.
+It's likely embedded systems only supports Machine mode and/or User mode. */
+#define portCONST_PRIVILEGE_USER		0x0UL
+#define portCONST_PRIVILEGE_MACHINE		0x3UL
+
 /* Machine status register (mstatus) related bit definitions.
-RV32 and RV64 share the same definitions for below. In embedded
-application scenarios, it's likely the target either only have
-M-mode or M-mode and U-mode.  */
+RV32 and RV64 share the same definitions for below. */
 #define portREG_MSTATUS_UIE_BIT			( 1UL )
 #define portREG_MSTATUS_MIE_BIT			( 1UL << 3UL )
+
+#define portREG_MSTATUS_MPP_BITS		( 3UL << 11UL )
+#define portREG_MSTATUS_MPIE_BIT		( 1UL << 7UL )
+
+/* Read-modify-write mstatus register to place caller task into user mode.
+ Once the task is in user mode, it cannot return to machine mode. refer to
+ https://www.freertos.org/portSWITCH_TO_USER_MODE.html */
+void vPortSwitchToUserMode( void );
+#define portSWITCH_TO_USER_MODE() vPortSwitchToUserMode();
 /*-----------------------------------------------------------*/
 
 
