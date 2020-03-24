@@ -114,6 +114,10 @@ void vPortSwitchToUserMode( void );
 #define portCONST_PMP_ABSOLUTE_MAX_ENTRIES	16UL	/* RISC-V supports up to 16 PMP entries. */
 #define portCONST_PMP_PORT_MAX_ENTRIES		8UL		/* Implementation specific value. */
 
+#if portCONST_PMP_PORT_MAX_ENTRIES > portCONST_PMP_ABSOLUTE_MAX_ENTRIES
+	#error RISC-V can only support up to portCONST_PMP_ABSOLUTE_MAX_ENTRIES PMP entries.
+#endif
+
 /* PMP configuration register.
 | bit7 | bit6-5      | bit4-3           | bit2      | bit1  | bit0 |
 | Lock | 0 (padding) | Address matching | eXecution | Write | Read |
@@ -138,8 +142,11 @@ eXecution, Write, Read: when set,  */
 #define portCONST_PMP_ACCESS_WRITABLE		( 1UL << 1UL )
 #define portCONST_PMP_ACCESS_READABLE		( 1UL )
 
-/* PMP configuration initial setting -- allow all accesses, TOR access and unlocked. */
-#define portCONST_PMP_CONFIG_INIT			( portCONST_PMP_ADDRESS_MODE_TOR | portCONST_PMP_ACCESS_EXECUTABLE portCONST_PMP_ACCESS_WRITABLE | portCONST_PMP_ACCESS_READABLE )
+/* PMP configuration initial setting -- disabled and unlocked. */
+#define portCONST_PMP_CONFIG_INIT			0UL
+
+/* PMP address initial value -- 0x0. */
+#define portCONST_PMP_ADDRESS_INIT			0UL
 
 
 /*-----------------------------------------------------------*/
