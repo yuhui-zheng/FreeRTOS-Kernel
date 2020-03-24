@@ -147,6 +147,105 @@ task stack, not the ISR stack). */
 #endif /* ( configMTIME_BASE_ADDRESS != 0 ) && ( configMTIME_BASE_ADDRESS != 0 ) */
 /*-----------------------------------------------------------*/
 
+void vPortSwitchToUserMode( void )
+{
+uint32_t ulRegMstatus;
+
+	/* Read mstatus register. */
+	__asm volatile( "csrr %0, mstatus" : "=r" ( ulRegMstatus ) );
+
+	/* Modify mstatus register value in preparation for switching to user mode.
+	 * Set the interrupt enable bit prior to active prior -- mstatus.MPIE = 0b0
+	 * Set previous privilege mode to U -- mstatus.MPP = 0b00. */
+	ulRegMstatus = ulRegMstatus & ( ~portREG_MSTATUS_MPIE_BIT );
+	ulRegMstatus = ulRegMstatus & ( ~portREG_MSTATUS_MPP_BITS );
+
+	/* Write mstatus register. */
+	__asm volatile( "csrw mstatus, %0" :: "r" ( ulRegMstatus ) : "memory" );
+
+	asm volatile ("mret");
+}
+/*-----------------------------------------------------------*/
+
+static uint32_t prvSetupPMP( void )
+{
+uint32_t ulHartId;
+
+#if __riscv_xlen == 64
+	uint64_t ullPmpCfg;
+#elif __riscv_xlen == 32
+	uint32_t ulPmpCfg;
+#else
+	#error Assembler did not define __riscv_xlen
+#endif
+
+	/* After reset, device boots up in machine mode. Thus explicit mode switch is not
+	required in this function. */
+
+	/* Get hart ID. PMP machine-mode control registers are per-hart. */
+	__asm volatile( "csrr %0, mhartid" : "=r"( ulHartId ) );
+
+	/* Set pmpaddr0 - pmpaddr15 registers to know values.
+	Both RV32 and RV64 support up to 16 entries, and the exact number is implementation
+	dependent. pmpaddrx registers are WARL (Writes Any, Reads Legal values), so that
+	writing registers indifferently doesn't hurt. */
+	__asm volatile
+	(
+		"csrw pmpaddr0, %0		\n"
+		"csrw pmpaddr1, %0		\n"
+		"csrw pmpaddr2, %0		\n"
+		"csrw pmpaddr3, %0		\n"
+		"csrw pmpaddr4, %0		\n"
+		"csrw pmpaddr5, %0		\n"
+		"csrw pmpaddr6, %0		\n"
+		"csrw pmpaddr7, %0		\n"
+		"csrw pmpaddr8, %0		\n"
+		"csrw pmpaddr9, %0		\n"
+		"csrw pmpaddr10, %0		\n"
+		"csrw pmpaddr11, %0		\n"
+		"csrw pmpaddr12, %0		\n"
+		"csrw pmpaddr13, %0		\n"
+		"csrw pmpaddr14, %0		\n"
+		"csrw pmpaddr15, %0		\n"
+		:: "i" ( portCONST_PMP_ADDRESS_INIT ) : "memory"
+	);
+
+	/* Set pmpcfg0 - pmpcfg3 to known values.
+	RV32 could use all four pmpcfgx registers. RV64, however, uses only pmpcfg0 and
+	pmpcfg2. pmpcfg1 and pmpcfg3 are illegal on RV64. pmpcfgx registers are WARL (Writes
+	Any, Reads Legal values), so that writing registers indifferently doesn't hurt. */
+	#if __riscv_xlen == 64
+		ullPmpCfg = portCONST_PMP_CONFIG_INIT | ( portCONST_PMP_CONFIG_INIT << 8UL ) | ( portCONST_PMP_CONFIG_INIT << 16UL ) | ( portCONST_PMP_CONFIG_INIT << 24UL ) |
+					( portCONST_PMP_CONFIG_INIT << 32UL ) | ( portCONST_PMP_CONFIG_INIT << 40UL ) | ( portCONST_PMP_CONFIG_INIT << 48UL ) | ( portCONST_PMP_CONFIG_INIT << 56UL );
+
+		__asm volatile
+		(
+			"csrw pmpcfg0, %0	\n"
+			"csrw pmpcfg2, %0	\n"
+			:: "r" ( ullPmpCfg ) : "memory"
+		);
+
+	#elif __riscv_xlen == 32
+		ulPmpCfg = portCONST_PMP_CONFIG_INIT | ( portCONST_PMP_CONFIG_INIT << 8UL ) | ( portCONST_PMP_CONFIG_INIT << 16UL ) | ( portCONST_PMP_CONFIG_INIT << 24UL );
+
+		__asm volatile
+				(
+					"csrw pmpcfg0, %0	\n"
+					"csrw pmpcfg1, %0	\n"
+					"csrw pmpcfg2, %0	\n"
+					"csrw pmpcfg3, %0	\n"
+					:: "r" ( ulPmpCfg ) : "memory"
+				);
+
+	#else
+		#error Assembler did not define __riscv_xlen
+	#endif
+
+	/* Return on which hart we performed such setup. */
+	return ulHartId;
+}
+/*-----------------------------------------------------------*/
+
 BaseType_t xPortStartScheduler( void )
 {
 extern void xPortStartFirstTask( void );
@@ -172,6 +271,9 @@ extern void xPortStartFirstTask( void );
 		#endif	 /* configISR_STACK_SIZE_WORDS */
 	}
 	#endif /* configASSERT_DEFINED */
+
+	/* Configure hart PMP (physical memory protection) on which the scheduler is running. */
+	( void ) prvSetupPMP();
 
 	/* If there is a CLINT then it is ok to use the default implementation
 	in this file, otherwise vPortSetupTimerInterrupt() must be implemented to
