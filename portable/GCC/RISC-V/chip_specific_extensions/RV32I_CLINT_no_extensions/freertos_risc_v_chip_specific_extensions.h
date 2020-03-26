@@ -55,14 +55,75 @@
 
 #define portasmHAS_SIFIVE_CLINT 1
 #define portasmHAS_MTIME 1
-#define portasmADDITIONAL_CONTEXT_SIZE 0 /* Must be even number on 32-bit cores. */
+
+/* Saving additional registers for PMP support.
+SiFive FE310-G002 supports 8 PMP entries. Among pmpcfg0-3 and pmpaddr0-15, pmpcfg2-3
+are hard wired to zero, and pmpaddr8-15 are not used. A PMP register can only be
+programmed while in M-Mode and L-bit is not set. However, since PMP registers are
+WARL (Write Any Read Legal), invalid updates will be ignored. Thus, in this port,
+pmpcfg0-1 and pmpaddr0-7 will be saved as additional registers to each task context,
+regardless of state and lock bit. */
+#define portasmADDITIONAL_CONTEXT_SIZE			10 /* Must be even number on 32-bit cores. */
 
 .macro portasmSAVE_ADDITIONAL_REGISTERS
-	/* No additional registers to save, so this macro does nothing. */
+	addi sp, sp, -(portasmADDITIONAL_CONTEXT_SIZE * portWORD_SIZE) /* Make room for the additional registers. */
+
+	csrr t0, pmpcfg0
+	csrr t1, pmpcfg1
+
+	sw t0, 1 * portWORD_SIZE( sp )
+	sw t1, 2 * portWORD_SIZE( sp )
+
+	csrr t0, pmpaddr0
+	csrr t1, pmpaddr1
+	csrr t2, pmpaddr2
+	csrr t3, pmpaddr3
+
+	sw t0, 3 * portWORD_SIZE( sp )
+	sw t1, 4 * portWORD_SIZE( sp )
+	sw t2, 5 * portWORD_SIZE( sp )
+	sw t3, 6 * portWORD_SIZE( sp )
+
+	csrr t0, pmpaddr4
+	csrr t1, pmpaddr5
+	csrr t2, pmpaddr6
+	csrr t3, pmpaddr7
+
+	sw t0, 7 * portWORD_SIZE( sp )
+	sw t1, 8 * portWORD_SIZE( sp )
+	sw t2, 9 * portWORD_SIZE( sp )
+	sw t3, 10 * portWORD_SIZE( sp )
+
 	.endm
 
 .macro portasmRESTORE_ADDITIONAL_REGISTERS
-	/* No additional registers to restore, so this macro does nothing. */
+	lw t0, 1 * portWORD_SIZE( sp )			/* Load additional registers into accessible temporary registers. */
+	lw t1, 2 * portWORD_SIZE( sp )
+
+	csrw pmpcfg0, t0
+	csrw pmpcfg1, t1
+
+	lw t0, 3 * portWORD_SIZE( sp )
+	lw t1, 4 * portWORD_SIZE( sp )
+	lw t2, 5 * portWORD_SIZE( sp )
+	lw t3, 6 * portWORD_SIZE( sp )
+
+	csrw pmpaddr0, t0
+	csrw pmpaddr1, t1
+	csrw pmpaddr2, t2
+	csrw pmpaddr3, t3
+
+	lw t0, 7 * portWORD_SIZE( sp )
+	lw t1, 8 * portWORD_SIZE( sp )
+	lw t2, 9 * portWORD_SIZE( sp )
+	lw t3, 10 * portWORD_SIZE( sp )
+
+	csrw pmpaddr4, t0
+	csrw pmpaddr5, t1
+	csrw pmpaddr6, t2
+	csrw pmpaddr7, t3
+
+	addi sp, sp, (portasmADDITIONAL_CONTEXT_SIZE * portWORD_SIZE )
 	.endm
 
 #endif /* __FREERTOS_RISC_V_EXTENSIONS_H__ */
