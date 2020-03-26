@@ -142,11 +142,11 @@ eXecution, Write, Read: when set,  */
 #define portCONST_PMP_ACCESS_WRITABLE		( 1UL << 1UL )
 #define portCONST_PMP_ACCESS_READABLE		( 1UL )
 
-/* PMP configuration initial setting -- disabled and unlocked. */
-#define portCONST_PMP_CONFIG_INIT			0UL
+/* PMP configuration initial setting -- allow all access. */
+#define portCONST_PMP_CONFIG_INIT			( portCONST_PMP_ADDRESS_MODE_NAPOT | portCONST_PMP_ACCESS_EXECUTABLE | portCONST_PMP_ACCESS_WRITABLE | portCONST_PMP_ACCESS_READABLE)
 
 /* PMP address initial value -- 0x0. */
-#define portCONST_PMP_ADDRESS_INIT			0UL
+#define portCONST_PMP_ADDRESS_INIT			( 1UL << (31UL + __riscv_xlen / 64UL ) * 32UL )
 
 
 /*-----------------------------------------------------------*/
