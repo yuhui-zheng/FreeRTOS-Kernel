@@ -78,6 +78,19 @@
     const StackType_t xISRStackTop = ( StackType_t ) __freertos_irq_stack_top;
 #endif
 
+/* mstatus bit mapping.
+ * These are mapped the same for RV32 and RV64.
+ * Most embedded profiles have M-mode and optionally U-mode.
+ * U-mode mstatus.mpp = 00 and M-mode mstatus.mpp = 11
+ */
+#define MSTATUS_MPRV_BIT_MASK 		( 1UL << 17UL )
+#define MSTATUS_MPP_BITS_MASK		( 3UL << 11UL )
+#define MSTATUS_MPIE_BIT_MASK		( 1UL << 7UL )
+#define MSTATUS_UPIE_BIT_MASK		( 1UL << 4UL )
+#define MSTATUS_MIE_BIT_MASK		( 1UL << 3UL )
+#define MSTATUS_UIE_BIT_MASK		( 1UL << 0UL )
+
+
 /*
  * Setup the timer to generate the tick interrupts.  The implementation in this
  * file is weak to allow application writers to change the timer used to
@@ -210,3 +223,79 @@ void vPortEndScheduler( void )
     {
     }
 }
+
+/*-----------------------------------------------------------*/
+
+BaseType_t vIsUserModeSupported( void )
+{
+	volatile uint32_t mstatus_original, mstatus;
+	BaseType_t retval;
+
+	/* Alternative to checking MPP WARL, could check misa.U bit. */
+
+	/* Read out current value of mstatus register. */
+	__asm volatile ( "csrr %0, mstatus" : "=r" ( mstatus_original ) );
+
+	/* mstatus.MPP is WARL (Write Any Read Legal). Thus by writing user mode
+	 * specific values (mstatus.mpp = 00) and test read out value, we could
+	 * determine whether U-mode is supported or not. */
+	__asm volatile ( "csrc mstatus, %0" ::"r" ( MSTATUS_MPP_BITS_MASK ) );
+	__asm volatile ( "csrr %0, mstatus" : "=r" ( mstatus ) );
+
+	/* Write back original value to not change mstatus_original status. */
+	__asm volatile ( "csrw mstatus, %0" ::"r" ( mstatus_original ) );
+
+	retval = ( ( mstatus & MSTATUS_MPP_BITS_MASK ) == 0) ? pdTRUE : pdFALSE;
+	return retval;
+}
+
+void vPortSwitchToUserMode( void ( *vUserModeEntryPoint )( void ), StackType_t xStackPointer, StackType_t xReturnAddress )
+{
+	volatile uint32_t mstatus;
+
+	__asm volatile ( "csrr %0, mstatus" : "=r" ( mstatus ) );
+
+	/* Set mstatus.MPP to U-mode, thus when mret is executed U-mode is restored. */
+	mstatus &= ~MSTATUS_MPP_BITS_MASK;
+
+	/* Preserve M-mode interrupt setting by set/clear mstatus.MPIE.
+	 * Thus when mret is executed mstatus.MIE is restored. */
+	if ( mstatus & MSTATUS_MIE_BIT_MASK )
+	{
+		mstatus |= MSTATUS_MPIE_BIT_MASK;
+	}
+	else
+	{
+		mstatus &= ~MSTATUS_MPIE_BIT_MASK;
+	}
+
+	/* Preserve U-mode interrupt setting by set/clear mstatus.UPIE.
+	 * Thus when mret is executed mstatus.UIE is restored.
+	 * User-level interrupts are primarily intended to support secure embedded
+	 * systems with only M-mode and U-mode present.
+	 * User-level interrupts require ISA N extension. */
+	if ( mstatus & MSTATUS_UIE_BIT_MASK )
+	{
+		mstatus |= MSTATUS_UPIE_BIT_MASK;
+	}
+	else
+	{
+		mstatus &= ~MSTATUS_UPIE_BIT_MASK;
+	}
+
+	__asm volatile ( "csrw mstatus, %0" ::"r" ( mstatus ) );
+
+	/* When a trap is taken into M-mode, mepc is written with the address of the
+	 * instruction that was interrupted or that encountered the exception. Write
+	 * U-mode entry point address, thus when mret is called execution resumes
+	 * from entry point. */
+	__asm volatile ( "csrw mepc, %0" ::"r" ( vUserModeEntryPoint ) );
+
+	/* Set the register files */
+	__asm volatile( "mv ra, %0" :: "r" ( xReturnAddress ) );
+	__asm volatile( "mv sp, %0" :: "r" ( xStackPointer ) );
+
+	__asm volatile ( "mret" );
+
+}
+
