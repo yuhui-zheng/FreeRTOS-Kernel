@@ -289,11 +289,32 @@ void vPortSwitchToUserMode( void ( *vUserModeEntryPoint )( void ), StackType_t x
 	 * instruction that was interrupted or that encountered the exception. Write
 	 * U-mode entry point address, thus when mret is called execution resumes
 	 * from entry point. */
-	__asm volatile ( "csrw mepc, %0" ::"r" ( vUserModeEntryPoint ) );
+	if ( vUserModeEntryPoint != NULL )
+	{
+		__asm volatile ( "csrw mepc, %0" ::"r" ( vUserModeEntryPoint ) );
+	}
+	else
+	{
+		__asm volatile ( "csrw mepc, ra" );
+	}
 
 	/* Set the register files */
-	__asm volatile( "mv ra, %0" :: "r" ( xReturnAddress ) );
-	__asm volatile( "mv sp, %0" :: "r" ( xStackPointer ) );
+	if ( xReturnAddress != 0 )
+	{
+		__asm volatile( "mv ra, %0" :: "r" ( xReturnAddress ) );
+	}
+	else
+	{
+		/* Preserve ra value, since 0 is likely an invalid return address. */
+	}
+
+	if ( xStackPointer != 0 )
+	{
+		__asm volatile( "mv sp, %0" :: "r" ( xStackPointer ) );
+	}
+	{
+		/* Preserve sp value, since 0 is likely an invalid stack pointer. */
+	}
 
 	__asm volatile ( "mret" );
 

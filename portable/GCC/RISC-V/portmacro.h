@@ -155,7 +155,7 @@
     #define portMEMORY_BARRIER()    __asm volatile ( "" ::: "memory" )
 /*-----------------------------------------------------------*/
     void vPortSwitchToUserMode( void ( *vUserModeEntryPoint )( void ), StackType_t xStackPointer, StackType_t xReturnAddress );
-    #define portSWITCH_TO_USER_MODE( fn, sp, ra )    vPortSwitchToUserMode( fn, sp, ra )
+    #define portSWITCH_TO_USER_MODE()    vPortSwitchToUserMode( NULL, 0, 0 )
 
 /*-----------------------------------------------------------*/
 /* configCLINT_BASE_ADDRESS is a legacy definition that was replaced by the
