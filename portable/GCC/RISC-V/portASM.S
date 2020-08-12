@@ -103,6 +103,7 @@ at the top of this file. */
 .global xPortStartFirstTask
 .global freertos_risc_v_trap_handler
 .global pxPortInitialiseStack
+.global vPortInitInterruptHandler
 .extern pxCurrentTCB
 .extern ulPortTrapHandler
 .extern vTaskSwitchContext
@@ -113,6 +114,7 @@ at the top of this file. */
 .extern uxTimerIncrementsForOneTick /* size_t type so 32-bit on 32-bit core and 64-bits on 64-bit core. */
 .extern xISRStackTop
 .extern portasmHANDLE_INTERRUPT
+.extern vPortPrivilegeAdjustment
 
 /*-----------------------------------------------------------*/
 
@@ -229,12 +231,19 @@ handle_synchronous:
 	addi a1, a1, 4						/* Synchronous so updated exception return address to the instruction after the instruction that generated the exeption. */
 	store_x a1, 0( sp )					/* Save updated exception return address. */
 
-test_if_environment_call:
-	li t0, 11 							/* 11 == environment call. */
-	bne a0, t0, is_exception			/* Not an M environment call, so some other exception. */
+test_if_m_env_call:
+	li t0, 11 							/* 11 == environment call from M-mode. */
+	bne a0, t0, test_if_u_env_call		/* Not an M environment call, so some other exception. */
 	load_x sp, xISRStackTop				/* Switch to ISR stack before function call. */
 	jal vTaskSwitchContext
 	j processed_source
+
+test_if_u_env_call:
+    li t0, 8                            /* 8 = environment call from U-mode. */
+    bne a0, t0, is_exception            /* Not an U environment call, so some other exception. */
+    load_x sp, xISRStackTop             /* Switch to ISR stack before function call. */
+    jal vPortPrivilegeAdjustment
+    j processed_source
 
 is_exception:
 	csrr t0, mcause						/* For viewing in the debugger only. */
@@ -293,19 +302,20 @@ processed_source:
 	mret
 	.endfunc
 /*-----------------------------------------------------------*/
+.align 8
+.func
+vPortInitInterruptHandler:
+    la t0, freertos_risc_v_trap_handler
+    csrw mtvec, t0
+
+    ret
+    .endfunc
+
+/*-----------------------------------------------------------*/
 
 .align 8
 .func
 xPortStartFirstTask:
-
-#if( portasmHAS_SIFIVE_CLINT != 0 )
-	/* If there is a clint then interrupts can branch directly to the FreeRTOS
-	trap handler.  Otherwise the interrupt controller will need to be configured
-	outside of this file. */
-	la t0, freertos_risc_v_trap_handler
-	csrw mtvec, t0
-#endif /* portasmHAS_CLILNT */
-
 	load_x  sp, pxCurrentTCB			/* Load pxCurrentTCB. */
 	load_x  sp, 0( sp )				 	/* Read sp from first TCB member. */
 
