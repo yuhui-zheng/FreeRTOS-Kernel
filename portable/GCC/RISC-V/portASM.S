@@ -241,9 +241,17 @@ test_if_m_env_call:
 test_if_u_env_call:
     li t0, 8                            /* 8 = environment call from U-mode. */
     bne a0, t0, is_exception            /* Not an U environment call, so some other exception. */
+
+    csrw mscratch, sp                   /* Save current sp, as we'll need to use this stack after function call. */
+
     load_x sp, xISRStackTop             /* Switch to ISR stack before function call. */
     jal vPortPrivilegeAdjustment
-    j processed_source
+
+    csrr sp, mscratch
+
+    portasmRESTORE_ADDITIONAL_REGISTERS /* Defined in freertos_risc_v_chip_specific_extensions.h to restore any registers unique to the RISC-V implementation. */
+
+    j pop_registers
 
 is_exception:
 	csrr t0, mcause						/* For viewing in the debugger only. */
@@ -269,6 +277,7 @@ processed_source:
 	load_x  t0, 29 * portWORD_SIZE( sp )
 	csrw mstatus, t0						/* Required for MPIE bit. */
 
+pop_registers:
 	load_x  x1, 1 * portWORD_SIZE( sp )
 	load_x  x5, 2 * portWORD_SIZE( sp )		/* t0 */
 	load_x  x6, 3 * portWORD_SIZE( sp )		/* t1 */
