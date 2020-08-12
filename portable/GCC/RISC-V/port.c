@@ -29,10 +29,17 @@
 * Implementation of functions defined in portable.h for the RISC-V RV32 port.
 *----------------------------------------------------------*/
 
+/* Defining MPU_WRAPPERS_INCLUDED_FROM_API_FILE prevents task.h from redefining
+ * all the API functions to use the MPU wrappers.  That should only be done when
+ * task.h is included from an application file. */
+#define MPU_WRAPPERS_INCLUDED_FROM_API_FILE
+
 /* Scheduler includes. */
 #include "FreeRTOS.h"
 #include "task.h"
 #include "portmacro.h"
+
+#undef MPU_WRAPPERS_INCLUDED_FROM_API_FILE
 
 /* Standard includes. */
 #include "string.h"
@@ -77,6 +84,11 @@
     extern const uint32_t __freertos_irq_stack_top[];
     const StackType_t xISRStackTop = ( StackType_t ) __freertos_irq_stack_top;
 #endif
+
+/* misa bit mapping.
+ * These are mapped the same for RV32 and RV64.
+ */
+#define MISA_EXTENSION_U			( 1UL << 20UL )
 
 /* mstatus bit mapping.
  * These are mapped the same for RV32 and RV64.
@@ -226,28 +238,21 @@ void vPortEndScheduler( void )
 
 /*-----------------------------------------------------------*/
 
-BaseType_t vIsUserModeSupported( void )
+BaseType_t vPortIsUserModeSupported( void )
 {
-	volatile uint32_t mstatus_original, mstatus;
+	volatile uint32_t misa;
 	BaseType_t retval;
 
-	/* Alternative to checking MPP WARL, could check misa.U bit. */
+	/* Alternative to reading misa.U bit, could use mstatus.MPP WARL property
+	 * to check whether U-mode is supported. */
 
-	/* Read out current value of mstatus register. */
-	__asm volatile ( "csrr %0, mstatus" : "=r" ( mstatus_original ) );
+	__asm volatile ( "csrr %0, misa" : "=r" ( misa ) );
 
-	/* mstatus.MPP is WARL (Write Any Read Legal). Thus by writing user mode
-	 * specific values (mstatus.mpp = 00) and test read out value, we could
-	 * determine whether U-mode is supported or not. */
-	__asm volatile ( "csrc mstatus, %0" ::"r" ( MSTATUS_MPP_BITS_MASK ) );
-	__asm volatile ( "csrr %0, mstatus" : "=r" ( mstatus ) );
-
-	/* Write back original value to not change mstatus_original status. */
-	__asm volatile ( "csrw mstatus, %0" ::"r" ( mstatus_original ) );
-
-	retval = ( ( mstatus & MSTATUS_MPP_BITS_MASK ) == 0) ? pdTRUE : pdFALSE;
+	retval = ( ( misa & MISA_EXTENSION_U ) == MISA_EXTENSION_U ) ? pdTRUE : pdFALSE;
 	return retval;
 }
+
+/*-----------------------------------------------------------*/
 
 void vPortSwitchToUserMode( void ( *vUserModeEntryPoint )( void ), StackType_t xStackPointer, StackType_t xReturnAddress )
 {
@@ -318,5 +323,69 @@ void vPortSwitchToUserMode( void ( *vUserModeEntryPoint )( void ), StackType_t x
 
 	__asm volatile ( "mret" );
 
+}
+
+/*-----------------------------------------------------------*/
+
+void vPortPrivilegeAdjustment(void)
+{
+	extern uint32_t __syscalls_flash_start__;
+	extern uint32_t __syscalls_flash_end__;
+	uint32_t ulAddressStart = (size_t)&__syscalls_flash_start__ ;
+	uint32_t ulAddressEnd = (size_t)&__syscalls_flash_end__;
+
+	volatile uint32_t mepc;
+	volatile uint32_t mstatus;
+
+	__asm volatile ( "csrr %0, mepc" : "=r" ( mepc ) );
+
+	if ( mepc >= ulAddressStart && mepc <= ulAddressEnd )
+	{
+		__asm volatile ( "csrr %0, mstatus" : "=r" ( mstatus ) );
+
+		/* Set mstatus.MPP to M-mode, thus when mret is executed M-mode is restored. */
+		mstatus |= MSTATUS_MPP_BITS_MASK;
+
+		/* Preserve M-mode interrupt setting by set/clear mstatus.MPIE.
+		 * Thus when mret is executed mstatus.MIE is restored. */
+		if ( mstatus & MSTATUS_MIE_BIT_MASK )
+		{
+			mstatus |= MSTATUS_MPIE_BIT_MASK;
+		}
+		else
+		{
+			mstatus &= ~MSTATUS_MPIE_BIT_MASK;
+		}
+
+		/* Preserve U-mode interrupt setting by set/clear mstatus.UPIE.
+		 * Thus when mret is executed mstatus.UIE is restored.
+		 * User-level interrupts are primarily intended to support secure embedded
+		 * systems with only M-mode and U-mode present.
+		 * User-level interrupts require ISA N extension. */
+		if ( mstatus & MSTATUS_UIE_BIT_MASK )
+		{
+			mstatus |= MSTATUS_UPIE_BIT_MASK;
+		}
+		else
+		{
+			mstatus &= ~MSTATUS_UPIE_BIT_MASK;
+		}
+
+		__asm volatile ( "csrw mstatus, %0" ::"r" ( mstatus ) );
+	}
+	else
+	{
+		/* The call is originated outside of the allowed range. Do not drop privilege.*/
+	}
+
+	/* ECALL causes the receiving privilege mode’s epc register to be set to the
+	 * address of the ECALL instruction itself. Thus we need to return to the following
+	 * instruction. */
+	mepc += sizeof(void *);
+	__asm volatile ( "csrw mepc, %0" ::"r" ( mepc ) );
+
+	/* This function is executed as part of the interrupt handler.
+	 * Preserve ra and sp, And mret is called at the end of the handler, thus
+	 * no need to call mret here. */
 }
 
