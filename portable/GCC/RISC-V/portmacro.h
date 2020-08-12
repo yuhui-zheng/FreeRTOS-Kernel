@@ -154,8 +154,44 @@
 
     #define portMEMORY_BARRIER()    __asm volatile ( "" ::: "memory" )
 /*-----------------------------------------------------------*/
+    #define portUSING_MPU_WRAPPERS    1
+
+    #ifndef configTOTAL_MPU_REGIONS
+        /* Define to 8 for backward compatibility. */
+        #define configTOTAL_MPU_REGIONS                              ( 8UL )
+    #endif
+
+    #define portUNPRIVILEGED_FLASH_REGION                            ( 0UL )
+    #define portPRIVILEGED_FLASH_REGION                              ( 1UL )
+    #define portPRIVILEGED_RAM_REGION                                ( 2UL )
+    #define portGENERAL_PERIPHERALS_REGION                           ( 3UL )
+    #define portSTACK_REGION                                         ( 4UL )
+    #define portFIRST_CONFIGURABLE_REGION                            ( 5UL )
+    #define portTOTAL_NUM_REGIONS                                    ( configTOTAL_MPU_REGIONS )
+    #define portNUM_CONFIGURABLE_REGIONS                             ( portTOTAL_NUM_REGIONS - portFIRST_CONFIGURABLE_REGION )
+    #define portLAST_CONFIGURABLE_REGION                             ( portTOTAL_NUM_REGIONS - 1 )
+
+    typedef struct MPU_REGION_REGISTERS
+    {
+        uint32_t ulRegionBaseAddress;
+        uint32_t ulRegionAttribute;
+    } xMPU_REGION_REGISTERS;
+
+    /* Plus 1 to create space for the stack region. */
+    typedef struct MPU_SETTINGS
+    {
+        xMPU_REGION_REGISTERS xRegion[ portTOTAL_NUM_REGIONS ];
+    } xMPU_SETTINGS;
+
+    BaseType_t vPortIsUserModeSupported( void );
+
     void vPortSwitchToUserMode( void ( *vUserModeEntryPoint )( void ), StackType_t xStackPointer, StackType_t xReturnAddress );
     #define portSWITCH_TO_USER_MODE()    vPortSwitchToUserMode( NULL, 0, 0 )
+
+    #define xPortRaisePrivilege()        __asm volatile ( "ecall" )
+    #define vPortResetPrivilege()        vPortSwitchToUserMode( NULL, 0, 0 )
+
+    void vPortInitInterruptHandler(void);
 
 /*-----------------------------------------------------------*/
 /* configCLINT_BASE_ADDRESS is a legacy definition that was replaced by the
