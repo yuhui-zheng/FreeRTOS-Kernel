@@ -46,44 +46,6 @@
 
 #undef MPU_WRAPPERS_INCLUDED_FROM_API_FILE
 
-/**
- * @brief Calls the port specific code to raise the privilege.
- *
- * @return pdFALSE if privilege was raised, pdTRUE otherwise.
- */
-BaseType_t xPortRaisePrivilege( void ) FREERTOS_SYSTEM_CALL;
-
-/**
- * @brief If xRunningPrivileged is not pdTRUE, calls the port specific
- * code to reset the privilege, otherwise does nothing.
- */
-void vPortResetPrivilege( BaseType_t xRunningPrivileged );
-/*-----------------------------------------------------------*/
-
-BaseType_t xPortRaisePrivilege( void ) /* FREERTOS_SYSTEM_CALL */
-{
-    BaseType_t xRunningPrivileged;
-
-    /* Check whether the processor is already privileged. */
-    xRunningPrivileged = portIS_PRIVILEGED();
-
-    /* If the processor is not already privileged, raise privilege. */
-    if( xRunningPrivileged == pdFALSE )
-    {
-        portRAISE_PRIVILEGE();
-    }
-
-    return xRunningPrivileged;
-}
-/*-----------------------------------------------------------*/
-
-void vPortResetPrivilege( BaseType_t xRunningPrivileged )
-{
-    if( xRunningPrivileged == pdFALSE )
-    {
-        portRESET_PRIVILEGE();
-    }
-}
 /*-----------------------------------------------------------*/
 
 #if ( configSUPPORT_DYNAMIC_ALLOCATION == 1 )
