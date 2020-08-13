@@ -188,9 +188,10 @@
     void vPortSwitchToUserMode( void );
 
     /* This is called only once either at the end of bootloader or beginning of kernel.
-     * mret return to the following instruction, which is the return address of the furntion. */
+     * mret returns to the following instruction, which is the return address of the function. */
     #define portSWITCH_TO_USER_MODE()                   vPortSwitchToUserMode();
 
+    /* This is called my mpu_wrappers.c to bump privilege before calling kernel API. */
     #define xPortRaisePrivilege()                       ({ \
                                                             volatile UBaseType_t ra; \
                                                             __asm volatile ( "mv %0, ra": "=r" ( ra ) ); \
@@ -198,7 +199,7 @@
                                                             ra; \
                                                         })
 
-    /* The shall never be called by user or kernel..*/
+    /* The shall never be called by user or kernel. */
     void vPortDropPrivilege( void );
 
     /* This shall never be called by user, but only mpu_wrappers.c.
