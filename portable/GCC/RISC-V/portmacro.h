@@ -185,11 +185,26 @@
 
     BaseType_t vPortIsUserModeSupported( void );
 
-    void vPortSwitchToUserMode( void ( *vUserModeEntryPoint )( void ), StackType_t xStackPointer, StackType_t xReturnAddress );
-    #define portSWITCH_TO_USER_MODE()    vPortSwitchToUserMode( NULL, 0, 0 )
+    void vPortSwitchToUserMode( void );
 
-    #define xPortRaisePrivilege()        __asm volatile ( "ecall" )
-    #define vPortResetPrivilege()        vPortSwitchToUserMode( NULL, 0, 0 )
+    /* This is called only once either at the end of bootloader or beginning of kernel.
+     * mret return to the following instruction, which is the return address of the furntion. */
+    #define portSWITCH_TO_USER_MODE()                   vPortSwitchToUserMode();
+
+    #define xPortRaisePrivilege()                       __asm volatile ( "ecall" )
+
+    /* The shall never be called by user or kernel..*/
+    void vPortDropPrivilege( void );
+
+    /* This shall never be called by user, but only mpu_wrappers.c.
+     * This is implemented as macro function to skip stack frame related manipulation. */
+    #define vPortResetPrivilege()                       { \
+                                                            vPortDropPrivilege(); \
+                                                            __asm volatile ( "csrr t3, mscratch" ); \
+                                                            __asm volatile ( "csrw mepc, t3" ); \
+                                                            __asm volatile ( "mv sp, fp" ); \
+                                                            __asm volatile ( "mret" ); \
+                                                        }
 
     void vPortInitInterruptHandler(void);
 
