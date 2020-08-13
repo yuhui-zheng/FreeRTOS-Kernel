@@ -254,7 +254,7 @@ BaseType_t vPortIsUserModeSupported( void )
 
 /*-----------------------------------------------------------*/
 
-void vPortSwitchToUserMode( void ( *vUserModeEntryPoint )( void ), StackType_t xStackPointer, StackType_t xReturnAddress )
+void vPortDropPrivilege( void )
 {
 	volatile uint32_t mstatus;
 
@@ -289,40 +289,23 @@ void vPortSwitchToUserMode( void ( *vUserModeEntryPoint )( void ), StackType_t x
 	}
 
 	__asm volatile ( "csrw mstatus, %0" ::"r" ( mstatus ) );
+}
+
+void vPortSwitchToUserMode( void )
+{
 
 	/* When a trap is taken into M-mode, mepc is written with the address of the
 	 * instruction that was interrupted or that encountered the exception. Write
 	 * U-mode entry point address, thus when mret is called execution resumes
-	 * from entry point. */
-	if ( vUserModeEntryPoint != NULL )
-	{
-		__asm volatile ( "csrw mepc, %0" ::"r" ( vUserModeEntryPoint ) );
-	}
-	else
-	{
-		__asm volatile ( "csrw mepc, ra" );
-	}
+	 * from entry point.
+	 *
+	 * Save ra before function call since ra is caller save register. */
+	__asm volatile ( "csrw mepc, ra" );
 
-	/* Set the register files */
-	if ( xReturnAddress != 0 )
-	{
-		__asm volatile( "mv ra, %0" :: "r" ( xReturnAddress ) );
-	}
-	else
-	{
-		/* Preserve ra value, since 0 is likely an invalid return address. */
-	}
-
-	if ( xStackPointer != 0 )
-	{
-		__asm volatile( "mv sp, %0" :: "r" ( xStackPointer ) );
-	}
-	{
-		/* Preserve sp value, since 0 is likely an invalid stack pointer. */
-	}
+	/* Update mstatus register. */
+	vPortDropPrivilege();
 
 	__asm volatile ( "mret" );
-
 }
 
 /*-----------------------------------------------------------*/
@@ -388,4 +371,7 @@ void vPortPrivilegeAdjustment(void)
 	 * Preserve ra and sp, And mret is called at the end of the handler, thus
 	 * no need to call mret here. */
 }
+
+/*-----------------------------------------------------------*/
+
 
