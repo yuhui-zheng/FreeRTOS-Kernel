@@ -191,20 +191,25 @@
      * mret return to the following instruction, which is the return address of the furntion. */
     #define portSWITCH_TO_USER_MODE()                   vPortSwitchToUserMode();
 
-    #define xPortRaisePrivilege()                       __asm volatile ( "ecall" )
+    #define xPortRaisePrivilege()                       ({ \
+                                                            volatile UBaseType_t ra; \
+                                                            __asm volatile ( "mv %0, ra": "=r" ( ra ) ); \
+                                                            __asm volatile ( "ecall" ); \
+                                                            ra; \
+                                                        })
 
     /* The shall never be called by user or kernel..*/
     void vPortDropPrivilege( void );
 
     /* This shall never be called by user, but only mpu_wrappers.c.
      * This is implemented as macro function to skip stack frame related manipulation. */
-    #define vPortResetPrivilege()                       { \
+    #define vPortResetPrivilege( ra )                   ({ \
                                                             vPortDropPrivilege(); \
-                                                            __asm volatile ( "csrr t3, mscratch" ); \
-                                                            __asm volatile ( "csrw mepc, t3" ); \
+                                                            __asm volatile ( "csrw mepc, %0"::"r" (ra) ); \
                                                             __asm volatile ( "mv sp, fp" ); \
                                                             __asm volatile ( "mret" ); \
-                                                        }
+                                                        })
+
 
     void vPortInitInterruptHandler(void);
 

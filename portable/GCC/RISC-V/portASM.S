@@ -249,11 +249,6 @@ test_if_u_env_call:
 
     csrr sp, mscratch
 
-    /* Store return address before function call in U-mode, since ra is caller
-     * save register. ra is the address we want to return to after dropping privilege. */
-    load_x  t0, 1 * portWORD_SIZE( sp )
-    csrw mscratch, t0
-
     portasmRESTORE_ADDITIONAL_REGISTERS /* Defined in freertos_risc_v_chip_specific_extensions.h to restore any registers unique to the RISC-V implementation. */
 
     j pop_registers
