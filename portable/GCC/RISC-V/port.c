@@ -291,6 +291,8 @@ void vPortDropPrivilege( void )
 	__asm volatile ( "csrw mstatus, %0" ::"r" ( mstatus ) );
 }
 
+/*-----------------------------------------------------------*/
+
 void vPortSwitchToUserMode( void )
 {
 
@@ -307,6 +309,10 @@ void vPortSwitchToUserMode( void )
 
 	__asm volatile ( "mret" );
 }
+
+/*-----------------------------------------------------------*/
+
+
 
 /*-----------------------------------------------------------*/
 
@@ -363,8 +369,8 @@ void vPortPrivilegeAdjustment(void)
 
 	/* ECALL causes the receiving privilege mode’s epc register to be set to the
 	 * address of the ECALL instruction itself. Thus we need to return to the following
-	 * instruction. */
-	mepc += sizeof(void *);
+	 * instruction. And we know for sure that ecall is a 32-bit instruction. */
+	mepc += 4;
 	__asm volatile ( "csrw mepc, %0" ::"r" ( mepc ) );
 
 	/* This function is executed as part of the interrupt handler.
@@ -374,4 +380,10 @@ void vPortPrivilegeAdjustment(void)
 
 /*-----------------------------------------------------------*/
 
+void vPortStoreTaskMPUSettings( xMPU_SETTINGS * xMPUSettings,
+                                const struct xMEMORY_REGION * const xRegions,
+                                StackType_t * pxBottomOfStack,
+                                uint32_t ulStackDepth )
+{
 
+}
