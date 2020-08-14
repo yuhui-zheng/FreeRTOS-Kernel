@@ -158,6 +158,9 @@
         #define xStreamBufferGenericCreate             MPU_xStreamBufferGenericCreate
         #define xStreamBufferGenericCreateStatic       MPU_xStreamBufferGenericCreateStatic
 
+/* Memory management APIs. */
+        #define pvPortMalloc                           MPU_pvPortMalloc
+        #define vPortFree                              MPU_vPortFree
 
 /* Remove the privileged function macro, but keep the PRIVILEGED_DATA
  * macro so applications can place data in privileged access sections

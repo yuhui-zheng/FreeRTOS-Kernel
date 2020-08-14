@@ -102,6 +102,13 @@
 #define MSTATUS_MIE_BIT_MASK		( 1UL << 3UL )
 #define MSTATUS_UIE_BIT_MASK		( 1UL << 0UL )
 
+/* PMP config entry mask offset. */
+#define PMP_ENTRY_CONFIG_PMP0CFG	( 0UL )
+
+/* PMP privilege setting. */
+#define PMP_PRIVILEGE_CONFIG_X		( 1UL << 2UL )
+#define PMP_PRIVILEGE_CONFIG_W		( 1UL << 1UL )
+#define PMP_PRIVILEGE_CONFIG_R		( 1UL << 0UL )
 
 /*
  * Setup the timer to generate the tick interrupts.  The implementation in this
@@ -312,11 +319,7 @@ void vPortSwitchToUserMode( void )
 
 /*-----------------------------------------------------------*/
 
-
-
-/*-----------------------------------------------------------*/
-
-void vPortPrivilegeAdjustment(void)
+void vPortTestGrantAccess(void)
 {
 	extern uint32_t __syscalls_flash_start__;
 	extern uint32_t __syscalls_flash_end__;
@@ -324,43 +327,19 @@ void vPortPrivilegeAdjustment(void)
 	uint32_t ulAddressEnd = (size_t)&__syscalls_flash_end__;
 
 	volatile uint32_t mepc;
-	volatile uint32_t mstatus;
+	volatile uint32_t pmpcfg0;
 
 	__asm volatile ( "csrr %0, mepc" : "=r" ( mepc ) );
 
 	if ( mepc >= ulAddressStart && mepc <= ulAddressEnd )
 	{
-		__asm volatile ( "csrr %0, mstatus" : "=r" ( mstatus ) );
+		__asm volatile ( "csrr %0, pmpcfg0" : "=r" ( pmpcfg0 ) );
 
-		/* Set mstatus.MPP to M-mode, thus when mret is executed M-mode is restored. */
-		mstatus |= MSTATUS_MPP_BITS_MASK;
+		/* Grant X/R access temporarily. */
+		pmpcfg0 |= PMP_PRIVILEGE_CONFIG_X << PMP_ENTRY_CONFIG_PMP0CFG;
+		pmpcfg0 |= PMP_PRIVILEGE_CONFIG_R << PMP_ENTRY_CONFIG_PMP0CFG ;
 
-		/* Preserve M-mode interrupt setting by set/clear mstatus.MPIE.
-		 * Thus when mret is executed mstatus.MIE is restored. */
-		if ( mstatus & MSTATUS_MIE_BIT_MASK )
-		{
-			mstatus |= MSTATUS_MPIE_BIT_MASK;
-		}
-		else
-		{
-			mstatus &= ~MSTATUS_MPIE_BIT_MASK;
-		}
-
-		/* Preserve U-mode interrupt setting by set/clear mstatus.UPIE.
-		 * Thus when mret is executed mstatus.UIE is restored.
-		 * User-level interrupts are primarily intended to support secure embedded
-		 * systems with only M-mode and U-mode present.
-		 * User-level interrupts require ISA N extension. */
-		if ( mstatus & MSTATUS_UIE_BIT_MASK )
-		{
-			mstatus |= MSTATUS_UPIE_BIT_MASK;
-		}
-		else
-		{
-			mstatus &= ~MSTATUS_UPIE_BIT_MASK;
-		}
-
-		__asm volatile ( "csrw mstatus, %0" ::"r" ( mstatus ) );
+		__asm volatile ( "csrw pmpcfg0, %0" ::"r" ( pmpcfg0 ) );
 	}
 	else
 	{
@@ -370,6 +349,32 @@ void vPortPrivilegeAdjustment(void)
 	/* ECALL causes the receiving privilege mode’s epc register to be set to the
 	 * address of the ECALL instruction itself. Thus we need to return to the following
 	 * instruction. And we know for sure that ecall is a 32-bit instruction. */
+	mepc += 4;
+	__asm volatile ( "csrw mepc, %0" ::"r" ( mepc ) );
+
+	/* This function is executed as part of the interrupt handler.
+	 * Preserve ra and sp, And mret is called at the end of the handler, thus
+	 * no need to call mret here. */
+}
+
+/*-----------------------------------------------------------*/
+void vPortRemoveAccess(void)
+{
+	volatile uint32_t pmpcfg0;
+	volatile uint32_t mepc;
+
+	__asm volatile ( "csrr %0, pmpcfg0" : "=r" ( pmpcfg0 ) );
+
+	/* Remove X/R access temporarily. */
+	pmpcfg0 &= ~(PMP_PRIVILEGE_CONFIG_X << PMP_ENTRY_CONFIG_PMP0CFG);
+	pmpcfg0 &= ~(PMP_PRIVILEGE_CONFIG_R << PMP_ENTRY_CONFIG_PMP0CFG) ;
+
+	__asm volatile ( "csrw pmpcfg0, %0" ::"r" ( pmpcfg0 ) );
+
+	/* ECALL causes the receiving privilege mode’s epc register to be set to the
+		 * address of the ECALL instruction itself. Thus we need to return to the following
+		 * instruction. And we know for sure that ecall is a 32-bit instruction. */
+	__asm volatile ( "csrr %0, mepc" : "=r" ( mepc ) );
 	mepc += 4;
 	__asm volatile ( "csrw mepc, %0" ::"r" ( mepc ) );
 

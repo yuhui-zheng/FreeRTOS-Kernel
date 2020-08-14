@@ -258,7 +258,8 @@ StreamBufferHandle_t MPU_xStreamBufferGenericCreateStatic( size_t xBufferSizeByt
                                                            BaseType_t xIsMessageBuffer,
                                                            uint8_t * const pucStreamBufferStorageArea,
                                                            StaticStreamBuffer_t * const pxStaticStreamBuffer ) FREERTOS_SYSTEM_CALL;
-
+void * MPU_pvPortMalloc( size_t xSize ) FREERTOS_SYSTEM_CALL;
+void MPU_vPortFree( void * pv ) FREERTOS_SYSTEM_CALL;
 
 
 #endif /* MPU_PROTOTYPES_H */

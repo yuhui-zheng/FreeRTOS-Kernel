@@ -68,6 +68,7 @@
 #endif
 
 #include "freertos_risc_v_chip_specific_extensions.h"
+#include "freertos_risc_v_syscall_number.h"
 
 /* Check the freertos_risc_v_chip_specific_extensions.h and/or command line
 definitions. */
@@ -114,7 +115,8 @@ at the top of this file. */
 .extern uxTimerIncrementsForOneTick /* size_t type so 32-bit on 32-bit core and 64-bits on 64-bit core. */
 .extern xISRStackTop
 .extern portasmHANDLE_INTERRUPT
-.extern vPortPrivilegeAdjustment
+.extern vPortTestGrantAccess
+.extern vPortRemoveAccess
 
 /*-----------------------------------------------------------*/
 
@@ -234,22 +236,71 @@ handle_synchronous:
 test_if_m_env_call:
 	li t0, 11 							/* 11 == environment call from M-mode. */
 	bne a0, t0, test_if_u_env_call		/* Not an M environment call, so some other exception. */
-	load_x sp, xISRStackTop				/* Switch to ISR stack before function call. */
-	jal vTaskSwitchContext
-	j processed_source
+
+    /* In this port, yield also happens in U-mode.
+     * M-mode environment call is considered invalid. */
+    j is_exception
 
 test_if_u_env_call:
     li t0, 8                            /* 8 = environment call from U-mode. */
     bne a0, t0, is_exception            /* Not an U environment call, so some other exception. */
 
+    /* Check syscall request number.
+     * By ecall calling convention, a7 (or x17) contains syscall request ID.
+     * Always check from lowest number to highest.*/
+    bne a7, zero, check_syscall_1       /* Check if yield. */
+
+    load_x sp, xISRStackTop             /* Switch to ISR stack before function call. */
+    jal vTaskSwitchContext
+    j processed_source
+
+check_syscall_1:
+    addi t3, zero, SYSCALL_ENABLE_M_IRQ   /* Check if enable M-mode interrupts. */
+    bne a7, t3, check_syscall_2
+
+    csrw mstatus, 8                       /* Return to U-mode with MIE bit set. */
+
+    csrr t3, mepc
+    addi t3, t3, 4
+    csrw mepc, t3
+
+    j pop_registers
+
+check_syscall_2:
+    addi t3, zero, SYSCALL_DISABLE_M_IRQ   /* Check if disable M-mode interrupts. */
+    bne a7, t3, check_syscall_3
+
+    csrw mstatus, 0                       /* Return to U-mode with MIE bit cleared. */
+
+    csrr t3, mepc
+    addi t3, t3, 4
+    csrw mepc, t3
+
+    j pop_registers
+
+check_syscall_3:
+    addi t3, zero, SYSCALL_ACCESS_REQUEST   /* Check if access request. */
+    bne a7, t3, check_syscall_4            /* This is currently the highetst number syscall ID. Others are unsupported. */
+
     csrw mscratch, sp                   /* Save current sp, as we'll need to use this stack after function call. */
 
     load_x sp, xISRStackTop             /* Switch to ISR stack before function call. */
-    jal vPortPrivilegeAdjustment
+    jal vPortTestGrantAccess
 
     csrr sp, mscratch
 
-    portasmRESTORE_ADDITIONAL_REGISTERS /* Defined in freertos_risc_v_chip_specific_extensions.h to restore any registers unique to the RISC-V implementation. */
+    j pop_registers
+
+check_syscall_4:
+    addi t3, zero, SYSCALL_REMOVE_ACCESS    /* Check if remove access. */
+    bne a7, t3, is_exception
+
+    csrw mscratch, sp                   /* Save current sp, as we'll need to use this stack after function call. */
+
+    load_x sp, xISRStackTop             /* Switch to ISR stack before function call. */
+    jal vPortRemoveAccess
+
+    csrr sp, mscratch
 
     j pop_registers
 
@@ -271,13 +322,13 @@ processed_source:
 	load_x t0, 0( sp )
 	csrw mepc, t0
 
-	portasmRESTORE_ADDITIONAL_REGISTERS	/* Defined in freertos_risc_v_chip_specific_extensions.h to restore any registers unique to the RISC-V implementation. */
-
 	/* Load mstatus with the interrupt enable bits used by the task. */
 	load_x  t0, 29 * portWORD_SIZE( sp )
 	csrw mstatus, t0						/* Required for MPIE bit. */
 
 pop_registers:
+    portasmRESTORE_ADDITIONAL_REGISTERS /* Defined in freertos_risc_v_chip_specific_extensions.h to restore any registers unique to the RISC-V implementation. */
+
 	load_x  x1, 1 * portWORD_SIZE( sp )
 	load_x  x5, 2 * portWORD_SIZE( sp )		/* t0 */
 	load_x  x6, 3 * portWORD_SIZE( sp )		/* t1 */
