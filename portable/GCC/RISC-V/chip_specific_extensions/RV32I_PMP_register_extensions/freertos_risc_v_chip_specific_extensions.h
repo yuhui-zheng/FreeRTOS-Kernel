@@ -55,14 +55,70 @@
 
 #define portasmHAS_SIFIVE_CLINT           1
 #define portasmHAS_MTIME                  1
-#define portasmADDITIONAL_CONTEXT_SIZE    0 /* Must be even number on 32-bit cores. */
+
+#define portasmADDITIONAL_CONTEXT_SIZE    10 /* For 8 PMP entries. */
 
 .macro portasmSAVE_ADDITIONAL_REGISTERS
-/* No additional registers to save, so this macro does nothing. */
+   addi sp, sp, -( portasmADDITIONAL_CONTEXT_SIZE * portWORD_SIZE ) /* Make room for the additional registers. */
+
+   csrr t0, pmpcfg0
+   csrr t1, pmpcfg1
+
+   sw t0, 0 * portWORD_SIZE( sp )
+   sw t1, 1 * portWORD_SIZE( sp )
+
+   csrr t0, pmpaddr0
+   csrr t1, pmpaddr1
+   csrr t2, pmpaddr2
+   csrr t3, pmpaddr3
+
+   sw t0, 2 * portWORD_SIZE( sp )
+   sw t1, 3 * portWORD_SIZE( sp )
+   sw t2, 4 * portWORD_SIZE( sp )
+   sw t3, 5 * portWORD_SIZE( sp )
+
+
+   csrr t0, pmpaddr4
+   csrr t1, pmpaddr5
+   csrr t2, pmpaddr6
+   csrr t3, pmpaddr7
+
+   sw t0, 6 * portWORD_SIZE( sp )
+   sw t1, 7 * portWORD_SIZE( sp )
+   sw t2, 8 * portWORD_SIZE( sp )
+   sw t3, 9 * portWORD_SIZE( sp )
    .endm
 
-   .macro portasmRESTORE_ADDITIONAL_REGISTERS
-/* No additional registers to restore, so this macro does nothing. */
+
+.macro portasmRESTORE_ADDITIONAL_REGISTERS
+   lw t0, 0 * portWORD_SIZE( sp ) /* Load additional registers into accessible temporary registers. */
+   lw t1, 1 * portWORD_SIZE( sp )
+
+   csrw pmpcfg0, t0
+   csrw pmpcfg1, t1
+
+   lw t0, 2 * portWORD_SIZE( sp )
+   lw t1, 3 * portWORD_SIZE( sp )
+   lw t2, 4 * portWORD_SIZE( sp )
+   lw t3, 5 * portWORD_SIZE( sp )
+
+   csrw pmpaddr0, t0
+   csrw pmpaddr1, t1
+   csrw pmpaddr2, t2
+   csrw pmpaddr3, t3
+
+   lw t0, 6 * portWORD_SIZE( sp )
+   lw t1, 7 * portWORD_SIZE( sp )
+   lw t2, 8 * portWORD_SIZE( sp )
+   lw t3, 9 * portWORD_SIZE( sp )
+
+   csrw pmpaddr4, t0
+   csrw pmpaddr5, t1
+   csrw pmpaddr6, t2
+   csrw pmpaddr7, t3
+
+   addi sp, sp, ( portasmADDITIONAL_CONTEXT_SIZE * portWORD_SIZE ) /* Remove space added for additional registers. */
+
    .endm
 
 #endif /* __FREERTOS_RISC_V_EXTENSIONS_H__ */
