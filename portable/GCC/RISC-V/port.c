@@ -312,10 +312,6 @@ void vPortSwitchToUserMode( void )
 
 /*-----------------------------------------------------------*/
 
-
-
-/*-----------------------------------------------------------*/
-
 void vPortPrivilegeAdjustment(void)
 {
 	extern uint32_t __syscalls_flash_start__;

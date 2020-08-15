@@ -58,6 +58,16 @@
 
 #define portasmADDITIONAL_CONTEXT_SIZE    10 /* For 8 PMP entries. */
 
+.macro portasmINCREMENT_MEPC
+    /* ECALL causes the receiving privilege mode’s epc register to be set to the
+     * address of the ECALL instruction itself. Thus to return to the following
+     * instruction, increment mepc register. +4 directly, since we know for sure
+     * that ecall is a 32-bit instruction. */
+    csrr t0, mepc
+    addi t0, t0, 4
+    csrw mepc, t0
+    .endm
+
 .macro portasmSAVE_ADDITIONAL_REGISTERS
    addi sp, sp, -( portasmADDITIONAL_CONTEXT_SIZE * portWORD_SIZE ) /* Make room for the additional registers. */
 

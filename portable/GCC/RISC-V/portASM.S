@@ -251,9 +251,7 @@ check_syscall_m3:
 
     /* Already in M-mode, nothing to be done here. mstatus is not changed.
      * Simply return to the next instruction in the caller. */
-    csrr t3, mepc
-    addi t3, t3, 4
-    csrw mepc, t3
+    portasmINCREMENT_MEPC               /* Increment mepc register to return to the following instruction. */
 
     portasmRESTORE_ADDITIONAL_REGISTERS
 
@@ -266,9 +264,7 @@ check_syscall_m4:
     li t4, 0x1800
     csrc mstatus, t4                    /* Clear mstatus.MPP. */
 
-    csrr t3, mepc
-    addi t3, t3, 4
-    csrw mepc, t3
+    portasmINCREMENT_MEPC               /* Increment mepc register to return to the following instruction. */
 
     portasmRESTORE_ADDITIONAL_REGISTERS
 
@@ -309,9 +305,7 @@ check_syscall_u4:
 
     /* Already in U-mode, nothing to be done.
      * mstatus is not changed, and simply return to the next instruction. */
-    csrr t3, mepc
-    addi t3, t3, 4
-    csrw mepc, t3
+    portasmINCREMENT_MEPC                   /* Increment mepc register to return to the following instruction. */
 
     portasmRESTORE_ADDITIONAL_REGISTERS
 
