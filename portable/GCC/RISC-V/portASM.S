@@ -115,7 +115,7 @@ at the top of this file. */
 .extern uxTimerIncrementsForOneTick /* size_t type so 32-bit on 32-bit core and 64-bits on 64-bit core. */
 .extern xISRStackTop
 .extern portasmHANDLE_INTERRUPT
-.extern vPortPrivilegeAdjustment
+.extern vPortIsPrivilegedAccessAuthorized
 
 /*-----------------------------------------------------------*/
 
@@ -291,9 +291,17 @@ check_syscall_u3:
     csrw mscratch, sp                   /* Save current sp, as we'll need to use this stack after function call. */
 
     load_x sp, xISRStackTop             /* Switch to ISR stack before function call. */
-    jal vPortPrivilegeAdjustment
 
+    jal vPortIsPrivilegedAccessAuthorized
+    beq a0, zero, u3_not_authorized
+
+    li t4, 0x1800
+    csrs mstatus, t4                    /* Set mstatus.MPP. */
+
+u3_not_authorized:
     csrr sp, mscratch
+
+    portasmINCREMENT_MEPC               /* Increment mepc register to return to the following instruction. */
 
     portasmRESTORE_ADDITIONAL_REGISTERS
 
