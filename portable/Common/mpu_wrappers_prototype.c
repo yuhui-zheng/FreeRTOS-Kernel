@@ -48,6 +48,19 @@
 
 /*-----------------------------------------------------------*/
 
+void MPU_vTaskStartScheduler( void )
+{
+	UBaseType_t ulReturnAddress = xPortRaisePrivilege();
+	vTaskStartScheduler();
+
+	/* Should not reach below. To ensure all tasks run in unprivileged mode,
+	 * drop privilege at the very end of xPortStartFirstTask(). */
+	vPortResetPrivilege(ulReturnAddress);
+	return;
+}
+
+/*-----------------------------------------------------------*/
+
 #if ( configSUPPORT_DYNAMIC_ALLOCATION == 1 )
     BaseType_t MPU_xTaskCreateRestricted( const TaskParameters_t * const pxTaskDefinition,
                                           TaskHandle_t * pxCreatedTask ) /* FREERTOS_SYSTEM_CALL */
