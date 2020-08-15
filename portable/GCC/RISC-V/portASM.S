@@ -115,7 +115,6 @@ at the top of this file. */
 .extern xISRStackTop
 .extern portasmHANDLE_INTERRUPT
 .extern vPortPrivilegeAdjustment
-.extern vPortSwitchToUserMode
 
 /*-----------------------------------------------------------*/
 
@@ -366,16 +365,6 @@ xPortStartFirstTask:
 	load_x  x5, 2 * portWORD_SIZE( sp )		/* Initial x5 (t0) value. */
 
 	addi	sp, sp, portCONTEXT_SIZE
-
-    /* Drop privilege as the last thing before entering threading mode.
-     * All future context switch will be handled in interrupt handler. */
-	csrw mscratch, sp                   /* Save current sp, as we'll need to use this stack after function call. */
-
-    load_x sp, xISRStackTop             /* Switch to ISR stack before function call. */
-    jal vPortSwitchToUserMode
-
-    csrr sp, mscratch
-
 	ret
 	.endfunc
 /*-----------------------------------------------------------*/
