@@ -253,64 +253,6 @@ BaseType_t vPortIsUserModeSupported( void )
 }
 
 /*-----------------------------------------------------------*/
-
-void vPortDropPrivilege( void )
-{
-	volatile uint32_t mstatus;
-
-	__asm volatile ( "csrr %0, mstatus" : "=r" ( mstatus ) );
-
-	/* Set mstatus.MPP to U-mode, thus when mret is executed U-mode is restored. */
-	mstatus &= ~MSTATUS_MPP_BITS_MASK;
-
-	/* Preserve M-mode interrupt setting by set/clear mstatus.MPIE.
-	 * Thus when mret is executed mstatus.MIE is restored. */
-	if ( mstatus & MSTATUS_MIE_BIT_MASK )
-	{
-		mstatus |= MSTATUS_MPIE_BIT_MASK;
-	}
-	else
-	{
-		mstatus &= ~MSTATUS_MPIE_BIT_MASK;
-	}
-
-	/* Preserve U-mode interrupt setting by set/clear mstatus.UPIE.
-	 * Thus when mret is executed mstatus.UIE is restored.
-	 * User-level interrupts are primarily intended to support secure embedded
-	 * systems with only M-mode and U-mode present.
-	 * User-level interrupts require ISA N extension. */
-	if ( mstatus & MSTATUS_UIE_BIT_MASK )
-	{
-		mstatus |= MSTATUS_UPIE_BIT_MASK;
-	}
-	else
-	{
-		mstatus &= ~MSTATUS_UPIE_BIT_MASK;
-	}
-
-	__asm volatile ( "csrw mstatus, %0" ::"r" ( mstatus ) );
-}
-
-/*-----------------------------------------------------------*/
-
-void vPortSwitchToUserMode( void )
-{
-
-	/* When a trap is taken into M-mode, mepc is written with the address of the
-	 * instruction that was interrupted or that encountered the exception. Write
-	 * U-mode entry point address, thus when mret is called execution resumes
-	 * from entry point.
-	 *
-	 * Save ra before function call since ra is caller save register. */
-	__asm volatile ( "csrw mepc, ra" );
-
-	/* Update mstatus register. */
-	vPortDropPrivilege();
-
-	__asm volatile ( "mret" );
-}
-
-/*-----------------------------------------------------------*/
 BaseType_t vPortIsPrivilegedAccessAuthorized( void )
 {
 	extern uint32_t __syscalls_flash_start__;

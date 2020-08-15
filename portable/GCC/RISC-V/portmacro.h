@@ -191,13 +191,8 @@
 
     BaseType_t vPortIsUserModeSupported( void );
 
-    void vPortSwitchToUserMode( void );
+    #define portSWITCH_TO_USER_MODE()                   vPortResetPrivilege( pdTRUE );
 
-    /* This is called only once either at the end of bootloader or beginning of kernel.
-     * mret returns to the following instruction, which is the return address of the function. */
-    #define portSWITCH_TO_USER_MODE()                   vPortSwitchToUserMode();
-
-    /* This is called my mpu_wrappers.c to bump privilege before calling kernel API. */
     #define xPortRaisePrivilege()                       ({ \
                                                             __asm volatile ( "li a7, %0" :: "I" ( SYSCALL_ACCESS_REQUEST ) ); \
                                                             __asm volatile ( "ecall" ); \
