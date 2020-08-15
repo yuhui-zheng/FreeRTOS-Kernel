@@ -64,18 +64,18 @@
    csrr t0, pmpcfg0
    csrr t1, pmpcfg1
 
-   sw t0, 0 * portWORD_SIZE( sp )
-   sw t1, 1 * portWORD_SIZE( sp )
+   store_x t0, 1 * portWORD_SIZE( sp )
+   store_x t1, 2 * portWORD_SIZE( sp )
 
    csrr t0, pmpaddr0
    csrr t1, pmpaddr1
    csrr t2, pmpaddr2
    csrr t3, pmpaddr3
 
-   sw t0, 2 * portWORD_SIZE( sp )
-   sw t1, 3 * portWORD_SIZE( sp )
-   sw t2, 4 * portWORD_SIZE( sp )
-   sw t3, 5 * portWORD_SIZE( sp )
+   store_x t0, 3 * portWORD_SIZE( sp )
+   store_x t1, 4 * portWORD_SIZE( sp )
+   store_x t2, 5 * portWORD_SIZE( sp )
+   store_x t3, 6 * portWORD_SIZE( sp )
 
 
    csrr t0, pmpaddr4
@@ -83,34 +83,34 @@
    csrr t2, pmpaddr6
    csrr t3, pmpaddr7
 
-   sw t0, 6 * portWORD_SIZE( sp )
-   sw t1, 7 * portWORD_SIZE( sp )
-   sw t2, 8 * portWORD_SIZE( sp )
-   sw t3, 9 * portWORD_SIZE( sp )
+   store_x t0, 7 * portWORD_SIZE( sp )
+   store_x t1, 8 * portWORD_SIZE( sp )
+   store_x t2, 9 * portWORD_SIZE( sp )
+   store_x t3, 10 * portWORD_SIZE( sp )
    .endm
 
 
 .macro portasmRESTORE_ADDITIONAL_REGISTERS
-   lw t0, 0 * portWORD_SIZE( sp ) /* Load additional registers into accessible temporary registers. */
-   lw t1, 1 * portWORD_SIZE( sp )
+   load_x t0, 1 * portWORD_SIZE( sp ) /* Load additional registers into accessible temporary registers. */
+   load_x t1, 2 * portWORD_SIZE( sp )
 
    csrw pmpcfg0, t0
    csrw pmpcfg1, t1
 
-   lw t0, 2 * portWORD_SIZE( sp )
-   lw t1, 3 * portWORD_SIZE( sp )
-   lw t2, 4 * portWORD_SIZE( sp )
-   lw t3, 5 * portWORD_SIZE( sp )
+   load_x t0, 3 * portWORD_SIZE( sp )
+   load_x t1, 4 * portWORD_SIZE( sp )
+   load_x t2, 5 * portWORD_SIZE( sp )
+   load_x t3, 6 * portWORD_SIZE( sp )
 
    csrw pmpaddr0, t0
    csrw pmpaddr1, t1
    csrw pmpaddr2, t2
    csrw pmpaddr3, t3
 
-   lw t0, 6 * portWORD_SIZE( sp )
-   lw t1, 7 * portWORD_SIZE( sp )
-   lw t2, 8 * portWORD_SIZE( sp )
-   lw t3, 9 * portWORD_SIZE( sp )
+   load_x t0, 7 * portWORD_SIZE( sp )
+   load_x t1, 8 * portWORD_SIZE( sp )
+   load_x t2, 9 * portWORD_SIZE( sp )
+   load_x t3, 10 * portWORD_SIZE( sp )
 
    csrw pmpaddr4, t0
    csrw pmpaddr5, t1
