@@ -33,6 +33,8 @@
         extern "C" {
     #endif
 
+#include "freertos_risc_v_syscall_number.h"
+
 /*-----------------------------------------------------------
  * Port specific definitions.
  *
@@ -91,7 +93,11 @@
 
 /* Scheduler utilities. */
     extern void vTaskSwitchContext( void );
-    #define portYIELD()                                 __asm volatile ( "ecall" );
+    #define portYIELD()                                 {\
+                                                            __asm volatile ( "li a7, %0" :: "I" ( SYSCALL_SELF_YIELD ) ); \
+                                                            __asm volatile ( "ecall" ); \
+                                                        }
+
     #define portEND_SWITCHING_ISR( xSwitchRequired )    if( xSwitchRequired ) vTaskSwitchContext()
     #define portYIELD_FROM_ISR( x )                     portEND_SWITCHING_ISR( x )
 /*-----------------------------------------------------------*/
@@ -193,23 +199,16 @@
 
     /* This is called my mpu_wrappers.c to bump privilege before calling kernel API. */
     #define xPortRaisePrivilege()                       ({ \
-                                                            volatile UBaseType_t ra; \
-                                                            __asm volatile ( "mv %0, ra": "=r" ( ra ) ); \
+                                                            __asm volatile ( "li a7, %0" :: "I" ( SYSCALL_ACCESS_REQUEST ) ); \
                                                             __asm volatile ( "ecall" ); \
-                                                            ra; \
+                                                            pdTRUE; \
                                                         })
 
-    /* The shall never be called by user or kernel. */
-    void vPortDropPrivilege( void );
-
-    /* This shall never be called by user, but only mpu_wrappers.c.
-     * This is implemented as macro function to skip stack frame related manipulation. */
-    #define vPortResetPrivilege( ra )                   ({ \
-                                                            vPortDropPrivilege(); \
-                                                            __asm volatile ( "csrw mepc, %0"::"r" (ra) ); \
-                                                            __asm volatile ( "mv sp, fp" ); \
-                                                            __asm volatile ( "mret" ); \
-                                                        })
+	#define vPortResetPrivilege( value )                { \
+                                                            ( void ) value; \
+                                                            __asm volatile ( "li a7, %0" :: "I" ( SYSCALL_REMOVE_ACCESS ) ); \
+                                                            __asm volatile ( "ecall" ); \
+                                                        }
 
 
     void vPortInitInterruptHandler(void);

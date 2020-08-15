@@ -68,6 +68,7 @@
 #endif
 
 #include "freertos_risc_v_chip_specific_extensions.h"
+#include "freertos_risc_v_syscall_number.h"
 
 /* Check the freertos_risc_v_chip_specific_extensions.h and/or command line
 definitions. */
@@ -234,13 +235,62 @@ handle_synchronous:
 test_if_m_env_call:
 	li t0, 11 							/* 11 == environment call from M-mode. */
 	bne a0, t0, test_if_u_env_call		/* Not an M environment call, so some other exception. */
+
+    /* Check syscall request number.
+     * By ecall calling convention, a7 (or x17) contains syscall request ID.
+     * Always check from lowest number to highest.*/
+    bne a7, zero, check_syscall_m3       /* Check if yield. */
+
 	load_x sp, xISRStackTop				/* Switch to ISR stack before function call. */
 	jal vTaskSwitchContext
 	j processed_source
 
+check_syscall_m3:
+    addi t3, zero, SYSCALL_ACCESS_REQUEST   /* Check if request access to kernel APIs. */
+    bne a7, t3, check_syscall_m4
+
+    /* Already in M-mode, nothing to be done here. mstatus is not changed.
+     * Simply return to the next instruction in the caller. */
+    csrr t3, mepc
+    addi t3, t3, 4
+    csrw mepc, t3
+
+    portasmRESTORE_ADDITIONAL_REGISTERS
+
+    j pop_registers
+
+check_syscall_m4:
+    addi t3, zero, SYSCALL_REMOVE_ACCESS   /* Check if remove access to kernel APIs. */
+    bne a7, t3, is_exception
+
+    li t4, 0x1800
+    csrc mstatus, t4                    /* Clear mstatus.MPP. */
+
+    csrr t3, mepc
+    addi t3, t3, 4
+    csrw mepc, t3
+
+    portasmRESTORE_ADDITIONAL_REGISTERS
+
+    j pop_registers
+
+
 test_if_u_env_call:
     li t0, 8                            /* 8 = environment call from U-mode. */
     bne a0, t0, is_exception            /* Not an U environment call, so some other exception. */
+
+    /* Check syscall request number.
+     * By ecall calling convention, a7 (or x17) contains syscall request ID.
+     * Always check from lowest number to highest.*/
+    bne a7, zero, check_syscall_u3       /* Check if yield. */
+
+    load_x sp, xISRStackTop             /* Switch to ISR stack before function call. */
+    jal vTaskSwitchContext
+    j processed_source
+
+check_syscall_u3:
+    addi t3, zero, SYSCALL_ACCESS_REQUEST   /* Check if request access to kernel APIs. */
+    bne a7, t3, check_syscall_u4
 
     csrw mscratch, sp                   /* Save current sp, as we'll need to use this stack after function call. */
 
@@ -249,7 +299,21 @@ test_if_u_env_call:
 
     csrr sp, mscratch
 
-    portasmRESTORE_ADDITIONAL_REGISTERS /* Defined in freertos_risc_v_chip_specific_extensions.h to restore any registers unique to the RISC-V implementation. */
+    portasmRESTORE_ADDITIONAL_REGISTERS
+
+    j pop_registers
+
+check_syscall_u4:
+    addi t3, zero, SYSCALL_REMOVE_ACCESS   /* Check if remove access to kernel APIs. */
+    bne a7, t3, is_exception
+
+    /* Already in U-mode, nothing to be done.
+     * mstatus is not changed, and simply return to the next instruction. */
+    csrr t3, mepc
+    addi t3, t3, 4
+    csrw mepc, t3
+
+    portasmRESTORE_ADDITIONAL_REGISTERS
 
     j pop_registers
 
