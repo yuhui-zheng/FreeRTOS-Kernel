@@ -426,12 +426,20 @@ xPortStartFirstTask:
 	load_x  x31, 28 * portWORD_SIZE( sp )	/* t6 */
 
 	load_x  x5, 29 * portWORD_SIZE( sp )	/* Initial mstatus into x5 (t0) */
-	addi x5, x5, 0x08						/* Set MIE bit so the first task starts with interrupts enabled - required as returns with ret not eret. */
-	csrrw  x0, mstatus, x5					/* Interrupts enabled from here! */
-	load_x  x5, 2 * portWORD_SIZE( sp )		/* Initial x5 (t0) value. */
+	csrw mstatus, x5                        /* Restore execution state. */
 
+    li x5, MSTATUS_MPP_BITS_MASK            /* Clear mstatus.MPP so the first task executes in U-mode. */
+    csrc mstatus, x5
+
+    li x5, MSTATUS_MPIE_BIT_MASK            /* Set MIE bit so the first task starts with interrupts enabled. */
+    csrs mstatus, x5                        /* Interrupt is not enabled until mret is executed. */
+
+    csrw mepc, ra                           /* Jump to? */
+
+	load_x  x5, 2 * portWORD_SIZE( sp )		/* Initial x5 (t0) value. */
 	addi	sp, sp, portCONTEXT_SIZE
-	ret
+
+	mret
 	.endfunc
 /*-----------------------------------------------------------*/
 
