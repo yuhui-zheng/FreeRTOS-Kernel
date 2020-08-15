@@ -89,20 +89,6 @@
  * These are mapped the same for RV32 and RV64.
  */
 #define MISA_EXTENSION_U			( 1UL << 20UL )
-
-/* mstatus bit mapping.
- * These are mapped the same for RV32 and RV64.
- * Most embedded profiles have M-mode and optionally U-mode.
- * U-mode mstatus.mpp = 00 and M-mode mstatus.mpp = 11
- */
-#define MSTATUS_MPRV_BIT_MASK 		( 1UL << 17UL )
-#define MSTATUS_MPP_BITS_MASK		( 3UL << 11UL )
-#define MSTATUS_MPIE_BIT_MASK		( 1UL << 7UL )
-#define MSTATUS_UPIE_BIT_MASK		( 1UL << 4UL )
-#define MSTATUS_MIE_BIT_MASK		( 1UL << 3UL )
-#define MSTATUS_UIE_BIT_MASK		( 1UL << 0UL )
-
-
 /*
  * Setup the timer to generate the tick interrupts.  The implementation in this
  * file is weak to allow application writers to change the timer used to
